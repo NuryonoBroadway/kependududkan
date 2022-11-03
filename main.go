@@ -18,7 +18,6 @@ func main() {
 	source := flag.String("source", "", "source to define a source file")
 	target := flag.String("target", "", "target to define a target file")
 	dukuh := flag.String("desa", "", "target to define a dukuh")
-	output := flag.String("output", ".", "target to set a output file")
 
 	flag.Parse()
 
@@ -35,12 +34,18 @@ func main() {
 	}
 	defer excelFile.Close()
 
+	path, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Info(path)
+
 	info, err := csvFile.Stat()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	exit, err := os.Create(fmt.Sprintf("%v/%v", *output, info.Name()))
+	exit, err := os.Create(fmt.Sprintf("%v/output/%v", path, info.Name()))
 	if err != nil {
 		log.Fatal(err)
 	}
