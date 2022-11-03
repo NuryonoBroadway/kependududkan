@@ -42,6 +42,7 @@ func main() {
 
 	info, err := csvFile.Stat()
 	if err != nil {
+		log.Info("cant find info")
 		log.Fatal(err)
 	}
 
