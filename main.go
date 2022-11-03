@@ -47,6 +47,7 @@ func main() {
 
 	exit, err := os.Create(fmt.Sprintf("%v/output/%v", path, info.Name()))
 	if err != nil {
+		log.Info("create failed")
 		log.Fatal(err)
 	}
 	defer exit.Close()
