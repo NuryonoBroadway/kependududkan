@@ -57,8 +57,7 @@ func (i Init) ReadExcelFile(reader *File, jobs chan<- []interface{}, wg *sync.Wa
 			schema := make([]interface{}, 0)
 			for where, lobby := range i.SourceHeaders {
 				if where == 0 {
-					loc, _ := time.LoadLocation("Asia/Jakarta")
-					schema = append(schema, time.Now().In(loc).Format("01/02/2006 15:04:05"))
+					schema = append(schema, time.Now().UTC().Local().Format("01/02/2006 15:04:05"))
 					continue
 				} else if where == 1 {
 					schema = append(schema, cases.Title(language.Indonesian, cases.Compact).String(i.Dukuh))
