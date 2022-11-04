@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -18,36 +17,30 @@ import (
 
 // var dataHeaders = make([]string, 0)
 
-func (i Init) OpenCsvFile(source string) (*File, *os.File, error) {
+func (i Init) OpenFile(source string, target string) (*File, error) {
 	log.Info("open csv file")
 	drop := &File{}
 
-	ext := filepath.Ext(source)
-
-	var file *os.File
 	var err error
 
-	switch ext {
-	case ".csv":
-		file, err = os.Open(source)
-		if err != nil {
-			log.Info(err)
-			return nil, nil, err
-		}
-		drop.csv = csv.NewReader(file)
-	case ".xlsx":
-		file, err = os.Open(source)
-		if err != nil {
-			log.Info(err)
-			return nil, nil, err
-		}
-		drop.excel, err = excelize.OpenReader(file)
-		if err != nil {
-			return nil, nil, nil
-		}
+	drop.CsvFile, err = os.Open(source)
+	if err != nil {
+		log.Info(err)
+		return nil, err
+	}
+	drop.csv = csv.NewReader(drop.CsvFile)
+
+	drop.ExcelFile, err = os.Open(target)
+	if err != nil {
+		log.Info(err)
+		return nil, err
+	}
+	drop.excel, err = excelize.OpenReader(drop.ExcelFile)
+	if err != nil {
+		return nil, nil
 	}
 
-	return drop, file, nil
+	return drop, nil
 }
 
 func (i Init) DispatchCsvWorkers(jobs <-chan []interface{}, file *os.File, wg *sync.WaitGroup) {
@@ -81,6 +74,7 @@ func (i Init) ReadCsvFile(reader *File, jobs chan<- []interface{}, wg *sync.Wait
 
 		if len(header) == 0 {
 			header = row
+			continue
 		}
 
 		schema := make([]interface{}, 0)

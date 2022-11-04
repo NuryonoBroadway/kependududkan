@@ -2,6 +2,7 @@ package initiate
 
 import (
 	"encoding/csv"
+	"os"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -10,21 +11,21 @@ import (
 type M map[string]interface{}
 
 type Init struct {
-	TotalWorker   int
-	SourceHeaders []string
-	Dukuh         string
+	TotalWorker int
+	Dukuh       string
 }
 
 type File struct {
-	excel *excelize.File
-	csv   *csv.Reader
+	excel     *excelize.File
+	csv       *csv.Reader
+	ExcelFile *os.File
+	CsvFile   *os.File
 }
 
 func NewInit(dukuh string) Init {
 	return Init{
-		TotalWorker:   100,
-		SourceHeaders: []string{},
-		Dukuh:         strings.ToLower(dukuh),
+		TotalWorker: 100,
+		Dukuh:       strings.ToLower(dukuh),
 	}
 }
 

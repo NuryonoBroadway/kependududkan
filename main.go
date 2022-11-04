@@ -18,24 +18,25 @@ func main() {
 	source := flag.String("source", "", "source to define a source file")
 	target := flag.String("target", "", "target to define a target file")
 	dukuh := flag.String("dukuh", "", "target to define a dukuh")
-	output := flag.String("output", ".", "target to define a output")
+	output := flag.String("output", ".", "to define a output")
 
 	flag.Parse()
 
 	in := initiate.NewInit(*dukuh)
-	readerCsv, csvFile, err := in.OpenCsvFile(*source)
+	reader, err := in.OpenFile(*source, *target)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer csvFile.Close()
+	defer reader.CsvFile.Close()
+	defer reader.ExcelFile.Close()
 
-	readerExel, excelFile, err := in.OpenCsvFile(*target)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer excelFile.Close()
+	// readerExel, excelFile, err := in.OpenCsvFile(*target)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer excelFile.Close()
 
-	info, err := csvFile.Stat()
+	info, err := reader.CsvFile.Stat()
 	if err != nil {
 		log.Info("cant find info")
 		log.Fatal(err)
@@ -48,16 +49,16 @@ func main() {
 	}
 	defer exit.Close()
 
-	originSource := make(chan []interface{})
+	// originSource := make(chan []interface{})
 	targetSource := make(chan []interface{})
 
 	wg := new(sync.WaitGroup)
 
-	go in.DispatchCsvWorkers(originSource, exit, wg)
-	in.SourceHeaders = in.ReadCsvFile(readerCsv, originSource, wg)
+	// go in.DispatchCsvWorkers(originSource, exit, wg)
+	// in.SourceHeaders = in.ReadCsvFile(readerCsv, originSource, wg)
 
-	go in.DispatchExelWorkers(targetSource, exit, wg)
-	in.ReadExcelFile(readerExel, targetSource, wg)
+	go in.DispatchWorkers(targetSource, exit, wg)
+	in.ReadFile(reader, targetSource, wg)
 
 	wg.Wait()
 

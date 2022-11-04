@@ -9,14 +9,27 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
-func (i Init) ReadExcelFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGroup) {
+func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGroup) {
 	// family := make(map[string][]interface{})
 
-	log.Info(i.SourceHeaders)
+	// make a header
+
+	row, err := reader.csv.ReadAll()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	header := row[0]
+
+	newRow := make([][]string, len(row))
+
+	log.Info(header)
 	for _, sheet := range reader.excel.GetSheetMap() {
 		// sheet := "RT 65"
 		log.Infof("sheets %v", sheet)
@@ -55,7 +68,7 @@ func (i Init) ReadExcelFile(reader *File, jobs chan<- []interface{}, wg *sync.Wa
 
 		for l := 2; l < len(rows); l++ {
 			schema := make([]interface{}, 0)
-			for where, lobby := range i.SourceHeaders {
+			for where, lobby := range header {
 				if where == 0 {
 					schema = append(schema, time.Now().Local().Format("01/02/2006 15:04:05"))
 					continue
@@ -80,15 +93,58 @@ func (i Init) ReadExcelFile(reader *File, jobs chan<- []interface{}, wg *sync.Wa
 				}
 			}
 
-			wg.Add(1)
-			jobs <- schema
+			if slices.Contains(rows[0], "NIK") {
+				skip := false
+				for i, each := range row {
+					if i == 0 {
+						continue
+					}
+					if slices.Contains(each, rows[l][searchIndex(rows[0], "NIK")]) {
+						skip = true
+					} else {
+						newRow[i] = each
+					}
+				}
+
+				if skip {
+					continue
+				} else {
+					wg.Add(1)
+					jobs <- schema
+				}
+			}
 		}
 
 	}
+
+	for _, row := range newRow {
+		schema := make([]interface{}, 0)
+		for _, each := range row {
+			schema = append(schema, each)
+		}
+
+		if len(schema) < 1 {
+			continue
+		} else {
+			wg.Add(1)
+			jobs <- schema
+		}
+	}
+
 	close(jobs)
 }
 
-func (i Init) DispatchExelWorkers(jobs <-chan []interface{}, file *os.File, wg *sync.WaitGroup) {
+func searchIndex(row []string, target string) int {
+	for i, value := range row {
+		if strings.Contains(value, target) {
+			return i
+		}
+	}
+
+	return -1
+}
+
+func (i Init) DispatchWorkers(jobs <-chan []interface{}, file *os.File, wg *sync.WaitGroup) {
 	index := 0
 
 	// log.Info(job)
