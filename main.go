@@ -41,7 +41,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	exit, err := os.Create(fmt.Sprintf("%v/%v", output, info.Name()))
+	exit, err := os.Create(fmt.Sprintf("%v/%v", *output, info.Name()))
 	if err != nil {
 		log.Info("create failed")
 		log.Fatal(err)
