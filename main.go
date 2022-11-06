@@ -30,18 +30,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	in := initiate.NewInit(*dukuh, os.Args[1])
 	wg := new(sync.WaitGroup)
 
 	switch os.Args[1] {
 	case "add":
 		add_cmd.Parse(os.Args[2:])
+
+		in := initiate.NewInit(*dukuh, os.Args[1])
 		reader, err := in.OpenFile(*add_source, *target)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer reader.CsvFile.Close()
 		defer reader.ExcelFile.Close()
+		log.Info(in.Dukuh)
 
 		info, err := reader.CsvFile.Stat()
 		if err != nil {
@@ -65,6 +67,8 @@ func main() {
 
 	case "edit":
 		edit_cmd.Parse(os.Args[2:])
+
+		in := initiate.NewInit("", os.Args[1])
 		reader, err := in.OpenFile(*edit_source, *target)
 		if err != nil {
 			log.Fatal(err)

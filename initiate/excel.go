@@ -10,8 +10,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGroup) {
@@ -73,7 +71,7 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 					schema = append(schema, time.Now().Local().Format("01/02/2006 15:04:05"))
 					continue
 				} else if where == 1 {
-					schema = append(schema, cases.Title(language.Indonesian, cases.Compact).String(i.Dukuh))
+					schema = append(schema, strings.ToUpper(i.Dukuh))
 					continue
 				} else if strings.Contains(lobby, "RT") {
 					if where == whichRow(i.Dukuh) {
