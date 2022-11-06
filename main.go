@@ -15,52 +15,70 @@ import (
 func main() {
 	start := time.Now()
 
-	source := flag.String("source", "", "source to define a source file")
-	target := flag.String("target", "", "target to define a target file")
-	dukuh := flag.String("dukuh", "", "target to define a dukuh")
-	output := flag.String("output", ".", "to define a output")
+	add_cmd := flag.NewFlagSet("add", flag.ExitOnError)
+	add_source := add_cmd.String("source", "", "source to define a source file")
+	target := add_cmd.String("target", "", "target to define a target file")
+	dukuh := add_cmd.String("dukuh", "", "target to define a dukuh")
+	output := add_cmd.String("output", ".", "to define a output")
 
-	flag.Parse()
+	edit_cmd := flag.NewFlagSet("edit", flag.ExitOnError)
+	edit_source := edit_cmd.String("source", "", "source to define a source file")
+	part := edit_cmd.String("part", "", "target to define which column to edit. i.e: primary_key;header_nam:value|etch...")
 
-	in := initiate.NewInit(*dukuh)
-	reader, err := in.OpenFile(*source, *target)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer reader.CsvFile.Close()
-	defer reader.ExcelFile.Close()
-
-	// readerExel, excelFile, err := in.OpenCsvFile(*target)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer excelFile.Close()
-
-	info, err := reader.CsvFile.Stat()
-	if err != nil {
-		log.Info("cant find info")
-		log.Fatal(err)
+	if len(os.Args) < 2 {
+		fmt.Println("expected 'one' or 'two' subcommands")
+		os.Exit(1)
 	}
 
-	exit, err := os.Create(fmt.Sprintf("%v/%v", *output, info.Name()))
-	if err != nil {
-		log.Info("create failed")
-		log.Fatal(err)
-	}
-	defer exit.Close()
-
-	// originSource := make(chan []interface{})
-	targetSource := make(chan []interface{})
-
+	in := initiate.NewInit(*dukuh, os.Args[1])
 	wg := new(sync.WaitGroup)
 
-	// go in.DispatchCsvWorkers(originSource, exit, wg)
-	// in.SourceHeaders = in.ReadCsvFile(readerCsv, originSource, wg)
+	switch os.Args[1] {
+	case "add":
+		add_cmd.Parse(os.Args[2:])
+		reader, err := in.OpenFile(*add_source, *target)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer reader.CsvFile.Close()
+		defer reader.ExcelFile.Close()
 
-	go in.DispatchWorkers(targetSource, exit, wg)
-	in.ReadFile(reader, targetSource, wg)
+		info, err := reader.CsvFile.Stat()
+		if err != nil {
+			log.Info("cant find info")
+			log.Fatal(err)
+		}
 
-	wg.Wait()
+		exit, err := os.Create(fmt.Sprintf("%v/%v", *output, info.Name()))
+		if err != nil {
+			log.Info("create failed")
+			log.Fatal(err)
+		}
+		defer exit.Close()
+
+		targetSource := make(chan []interface{})
+
+		go in.DispatchWorkers(targetSource, exit, wg)
+		in.ReadFile(reader, targetSource, wg)
+
+		wg.Wait()
+
+	case "edit":
+		edit_cmd.Parse(os.Args[2:])
+		reader, err := in.OpenFile(*edit_source, *target)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer reader.CsvFile.Close()
+
+		targetSource := make(chan []string)
+		mtx := &sync.RWMutex{}
+
+		go in.MergeContent(targetSource, wg, mtx, *edit_source)
+		in.SwitchAnything(reader.CsvFile, targetSource, wg, *part, *edit_source)
+
+		wg.Wait()
+	}
 
 	duration := time.Since(start)
 	fmt.Println("done in", int(math.Ceil(duration.Seconds())), "seconds")
