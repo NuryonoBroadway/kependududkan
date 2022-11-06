@@ -25,6 +25,15 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 
 	header := row[0]
 
+	func() {
+		entry := make([]interface{}, 0)
+		for _, value := range header {
+			entry = append(entry, value)
+		}
+		wg.Add(1)
+		jobs <- entry
+	}()
+
 	newRow := make([][]string, len(row))
 
 	log.Info(header)
@@ -43,7 +52,7 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 		for i, d := range rows {
 			if len(d) != len(rows[0]) {
 				for l := len(d) + 1; l < len(rows[0]); l++ {
-					rows[i] = append(rows[i], "#")
+					rows[i] = append(rows[i], "-")
 				}
 			}
 
