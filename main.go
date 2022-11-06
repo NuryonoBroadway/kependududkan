@@ -72,9 +72,10 @@ func main() {
 		defer reader.CsvFile.Close()
 
 		targetSource := make(chan []string)
-		mtx := &sync.RWMutex{}
 
-		go in.MergeContent(targetSource, wg, mtx, *edit_source)
+		wg.Add(1)
+		go in.MergeContent(targetSource, wg, *edit_source)
+
 		in.SwitchAnything(reader.CsvFile, targetSource, wg, *part, *edit_source)
 
 		wg.Wait()

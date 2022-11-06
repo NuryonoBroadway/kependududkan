@@ -41,8 +41,7 @@ func (i Init) SwitchAnything(file *os.File, jobs chan<- []string, wg *sync.WaitG
 
 		for _, part := range partition.part {
 			if findHeader(header, part.change) {
-				search := row[searchIndex(header, part.change)]
-				if strings.Contains(search, part.id) {
+				if findHeader(row, part.id) {
 					log.Infof("found %v", part.id)
 					row[searchIndex(header, part.change)] = part.value
 					continue
@@ -74,10 +73,7 @@ func findHeader(header []string, target string) bool {
 	return false
 }
 
-func (i Init) MergeContent(jobs <-chan []string, wg *sync.WaitGroup, mtx *sync.RWMutex, path string) {
-	mtx.RLock()
-	defer mtx.RUnlock()
-
+func (i Init) MergeContent(jobs <-chan []string, wg *sync.WaitGroup, path string) {
 	var bs []byte
 	buf := bytes.NewBuffer(bs)
 
@@ -91,10 +87,13 @@ func (i Init) MergeContent(jobs <-chan []string, wg *sync.WaitGroup, mtx *sync.R
 		counter++
 	}
 
+	log.Info(buf.Len())
 	if err := os.WriteFile(path, buf.Bytes(), 0666); err != nil {
 		log.Error(err)
 		return
 	}
+
+	wg.Done()
 
 }
 
