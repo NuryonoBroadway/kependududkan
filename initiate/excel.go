@@ -13,10 +13,6 @@ import (
 )
 
 func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGroup) {
-	// family := make(map[string][]interface{})
-
-	// make a header
-
 	row, err := reader.csv.ReadAll()
 	if err != nil {
 		log.Error(err)
@@ -38,7 +34,6 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 
 	log.Info(header)
 	for _, sheet := range reader.excel.GetSheetMap() {
-		// sheet := "RT 65"
 		log.Infof("sheets %v", sheet)
 		rt := strings.Split(sheet, " ")[1]
 
@@ -73,6 +68,7 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 			}
 		}
 
+		tolerance := 0
 		for l := 2; l < len(rows); l++ {
 			schema := make([]interface{}, 0)
 			for where, lobby := range header {
@@ -92,12 +88,21 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 					}
 				} else {
 					for index, head := range rows[0] {
-						if lobby == head || i.sameHeader(lobby, head) {
+						if lobby == head {
+							if rows[l][index] == "-" {
+								tolerance += 1
+							}
 							schema = append(schema, rows[l][index])
-							break
+						} else if i.sameHeader(lobby, head) {
+							schema = append(schema, strings.ReplaceAll(rows[l][index], " ", ""))
 						}
 					}
 				}
+			}
+
+			if tolerance >= 3 {
+				tolerance = 0
+				continue
 			}
 
 			if slices.Contains(rows[0], "NIK") {
@@ -114,8 +119,10 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 				}
 
 				if skip {
+					tolerance = 0
 					continue
 				} else {
+					tolerance = 0
 					wg.Add(1)
 					jobs <- schema
 				}
@@ -203,7 +210,7 @@ func (i Init) doTheExcelJob(worker, counter int, file *os.File, job []interface{
 				builder = append(builder, fmt.Sprint(j))
 			}
 
-			log.Info(builder)
+			// log.Info(builder)
 			if err := w.Write(builder); err != nil {
 				log.Error(err)
 				return
