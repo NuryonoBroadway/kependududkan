@@ -37,6 +37,7 @@ func (i Init) SwitchAnything(file *os.File, jobs chan<- []string, wg *sync.WaitG
 		row := strings.Split(scanner.Text(), ",")
 		if len(header) == 0 {
 			header = row
+			continue
 		}
 
 		for _, part := range partition.part {

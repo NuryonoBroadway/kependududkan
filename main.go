@@ -6,6 +6,7 @@ import (
 	"kependudukan-patalan/initiate"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,15 +20,13 @@ func main() {
 	add_source := add_cmd.String("source", "", "source to define a source file")
 	target := add_cmd.String("target", "", "target to define a target file")
 	dukuh := add_cmd.String("dukuh", "", "target to define a dukuh")
-	output := add_cmd.String("output", ".", "to define a output")
 
 	edit_cmd := flag.NewFlagSet("edit", flag.ExitOnError)
 	edit_source := edit_cmd.String("source", "", "source to define a source file")
 	part := edit_cmd.String("part", "", "target to define which column to edit. i.e: primary_key;header_nam:value|etch...")
 
 	if len(os.Args) < 2 {
-		fmt.Println("expected 'one' or 'two' subcommands")
-		os.Exit(1)
+		log.Fatal("expected 'one' or 'two' subcommands")
 	}
 
 	wg := new(sync.WaitGroup)
@@ -35,6 +34,10 @@ func main() {
 	switch os.Args[1] {
 	case "add":
 		add_cmd.Parse(os.Args[2:])
+
+		if !findMe(*dukuh) {
+			log.Fatal("dukuh not found")
+		}
 
 		in := initiate.NewInit(*dukuh, os.Args[1])
 		reader, err := in.OpenFile(*add_source, *target)
@@ -45,23 +48,11 @@ func main() {
 		defer reader.ExcelFile.Close()
 		log.Info(in.Dukuh)
 
-		info, err := reader.CsvFile.Stat()
-		if err != nil {
-			log.Info("cant find info")
-			log.Fatal(err)
-		}
+		targetSource := make(chan []string)
 
-		exit, err := os.Create(fmt.Sprintf("%v/%v", *output, info.Name()))
-		if err != nil {
-			log.Info("create failed")
-			log.Fatal(err)
-		}
-		defer exit.Close()
-
-		targetSource := make(chan []interface{})
-
-		go in.DispatchWorkers(targetSource, exit, wg)
-		in.ReadFile(reader, targetSource, wg)
+		wg.Add(1)
+		go in.DispatchWorkers(targetSource, wg, *add_source)
+		in.ReadFile(reader, reader.CsvFile, targetSource, wg)
 
 		wg.Wait()
 
@@ -87,4 +78,32 @@ func main() {
 
 	duration := time.Since(start)
 	fmt.Println("done in", int(math.Ceil(duration.Seconds())), "seconds")
+}
+
+func findMe(location string) bool {
+	log.Infof("find location: %v", location)
+	dukuh := map[string]bool{
+		"bakulan kulon":  true, // 1
+		"bakulan wetan":  true, // 2
+		"ngaglik":        true, // 3
+		"gelangan":       true, // 4
+		"tanjung lor":    true, // 5
+		"jetis":          true, // 6
+		"tanjung karang": true, // 7
+		"gaduh":          true, // 8
+		"patalan":        true, // 9
+		"karang asem":    true, // 10
+		"panjang jiwo":   true, // 11
+		"gerselo":        true, // 12
+		"sulang lor":     true, // 13
+		"sulang kidul":   true, // 14
+		"dukuh sukun":    true, // 15
+		"butuh":          true, // 16
+		"boto":           true, // 17
+		"kategan":        true, // 18
+		"ketandan":       true, // 19
+		"bobok":          true, // 20
+	}
+
+	return dukuh[strings.ToLower(location)]
 }

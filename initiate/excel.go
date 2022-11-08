@@ -1,7 +1,8 @@
 package initiate
 
 import (
-	"encoding/csv"
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -12,25 +13,30 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGroup) {
-	row, err := reader.csv.ReadAll()
-	if err != nil {
+func (i Init) ReadFile(reader *File, file *os.File, jobs chan<- []string, wg *sync.WaitGroup) {
+	row := make([][]string, 0)
+	header := make([]string, 0)
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		each := strings.Split(scanner.Text(), ",")
+		if len(header) == 0 {
+			header = each
+			continue
+		}
+
+		row = append(row, each)
+	}
+
+	if err := scanner.Err(); err != nil {
 		log.Error(err)
 		return
 	}
 
-	header := row[0]
-
 	func() {
-		entry := make([]interface{}, 0)
-		for _, value := range header {
-			entry = append(entry, value)
-		}
 		wg.Add(1)
-		jobs <- entry
+		jobs <- header
 	}()
-
-	newRow := make([][]string, len(row))
 
 	log.Info(header)
 	for _, sheet := range reader.excel.GetSheetMap() {
@@ -68,9 +74,9 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 			}
 		}
 
-		tolerance := 0
 		for l := 2; l < len(rows); l++ {
-			schema := make([]interface{}, 0)
+			tolerance := 0
+			schema := make([]string, 0)
 			for where, lobby := range header {
 				if where == 0 {
 					schema = append(schema, time.Now().Local().Format("01/02/2006 15:04:05"))
@@ -100,48 +106,32 @@ func (i Init) ReadFile(reader *File, jobs chan<- []interface{}, wg *sync.WaitGro
 				}
 			}
 
-			if tolerance >= 3 {
+			if tolerance > 3 {
 				tolerance = 0
 				continue
 			}
 
 			if slices.Contains(rows[0], "NIK") {
-				skip := false
 				for i, each := range row {
 					if i == 0 {
 						continue
 					}
 					if slices.Contains(each, rows[l][searchIndex(rows[0], "NIK")]) {
-						skip = true
-					} else {
-						newRow[i] = each
+						row[i] = schema
 					}
 				}
-
-				if skip {
-					tolerance = 0
-					continue
-				} else {
-					tolerance = 0
-					wg.Add(1)
-					jobs <- schema
-				}
 			}
-		}
 
+			tolerance = 0
+		}
 	}
 
-	for _, row := range newRow {
-		schema := make([]interface{}, 0)
-		for _, each := range row {
-			schema = append(schema, each)
-		}
-
-		if len(schema) < 1 {
+	for _, row := range row {
+		if len(row) < 1 {
 			continue
 		} else {
 			wg.Add(1)
-			jobs <- schema
+			jobs <- row
 		}
 	}
 
@@ -156,24 +146,6 @@ func searchIndex(row []string, target string) int {
 	}
 
 	return -1
-}
-
-func (i Init) DispatchWorkers(jobs <-chan []interface{}, file *os.File, wg *sync.WaitGroup) {
-	index := 0
-
-	// log.Info(job)
-	for index <= i.TotalWorker {
-		go func(worker int, jobs <-chan []interface{}, file *os.File, wg *sync.WaitGroup) {
-			counter := 0
-
-			for job := range jobs {
-				i.doTheExcelJob(worker, counter, file, job)
-				wg.Done()
-				counter++
-			}
-		}(index, jobs, file, wg)
-		index++
-	}
 }
 
 func (i Init) sameHeader(lobby, header string) bool {
@@ -192,7 +164,28 @@ func (i Init) sameHeader(lobby, header string) bool {
 	return false
 }
 
-func (i Init) doTheExcelJob(worker, counter int, file *os.File, job []interface{}) {
+func (i Init) DispatchWorkers(jobs <-chan []string, wg *sync.WaitGroup, path string) {
+	var bs []byte
+	buf := bytes.NewBuffer(bs)
+
+	counter := 1
+
+	for job := range jobs {
+		i.doTheExcelJob(counter, buf, strings.Join(job, ","))
+		wg.Done()
+		counter++
+	}
+
+	log.Info(buf.Len())
+	if err := os.WriteFile(path, buf.Bytes(), 0777); err != nil {
+		log.Error(err)
+		return
+	}
+
+	wg.Done()
+}
+
+func (i Init) doTheExcelJob(counter int, buf *bytes.Buffer, job string) {
 	for {
 		var outerError error
 		func(outerError *error) {
@@ -202,18 +195,14 @@ func (i Init) doTheExcelJob(worker, counter int, file *os.File, job []interface{
 				}
 			}()
 
-			w := csv.NewWriter(file)
-			defer w.Flush()
-
-			builder := []string{}
-			for _, j := range job {
-				builder = append(builder, fmt.Sprint(j))
+			// log.Info(job)
+			_, err := buf.Write([]byte(job))
+			if err != nil {
+				log.Fatal(err)
 			}
-
-			// log.Info(builder)
-			if err := w.Write(builder); err != nil {
-				log.Error(err)
-				return
+			_, err = buf.WriteString("\n")
+			if err != nil {
+				log.Fatal(err)
 			}
 
 		}(&outerError)
@@ -222,5 +211,5 @@ func (i Init) doTheExcelJob(worker, counter int, file *os.File, job []interface{
 		}
 	}
 
-	log.Println("=> worker", worker, "inserted", counter, "data")
+	// log.Println("=> inserted", counter, "data")
 }
