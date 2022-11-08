@@ -98,7 +98,11 @@ func (i Init) ReadFile(reader *File, file *os.File, jobs chan<- []string, wg *sy
 							if rows[l][index] == "-" {
 								tolerance += 1
 							}
-							schema = append(schema, rows[l][index])
+							if strings.Contains(rows[l][index], ",") {
+								schema = append(schema, strings.ReplaceAll(rows[l][index], ",", ""))
+							} else {
+								schema = append(schema, rows[l][index])
+							}
 						} else if i.sameHeader(lobby, head) {
 							schema = append(schema, strings.ReplaceAll(rows[l][index], " ", ""))
 						}
@@ -111,15 +115,25 @@ func (i Init) ReadFile(reader *File, file *os.File, jobs chan<- []string, wg *sy
 				continue
 			}
 
+			find := false
 			if slices.Contains(rows[0], "NIK") {
 				for i, each := range row {
 					if i == 0 {
 						continue
 					}
-					if slices.Contains(each, rows[l][searchIndex(rows[0], "NIK")]) {
+					if slices.Contains(each, strings.ReplaceAll(rows[l][searchIndex(rows[0], "NIK")], " ", "")) {
+						find = true
 						row[i] = schema
+						break
 					}
+
 				}
+			}
+
+			if !find {
+				log.Infof("add: %v", strings.Join(schema, ","))
+				wg.Add(1)
+				jobs <- schema
 			}
 
 			tolerance = 0
@@ -176,7 +190,6 @@ func (i Init) DispatchWorkers(jobs <-chan []string, wg *sync.WaitGroup, path str
 		counter++
 	}
 
-	log.Info(buf.Len())
 	if err := os.WriteFile(path, buf.Bytes(), 0777); err != nil {
 		log.Error(err)
 		return
@@ -195,7 +208,6 @@ func (i Init) doTheExcelJob(counter int, buf *bytes.Buffer, job string) {
 				}
 			}()
 
-			// log.Info(job)
 			_, err := buf.Write([]byte(job))
 			if err != nil {
 				log.Fatal(err)

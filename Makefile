@@ -5,9 +5,10 @@ add:
 	git add .
 
 commit:
-	git commit $(message)
+	git commit -m $(message)
 
 push:
 	git push -uf origin main
+
 
 PHONY: build add commit push
